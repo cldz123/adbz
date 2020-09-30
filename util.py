@@ -55,8 +55,8 @@ def execute_cmd_with_stdout(cmd, work_dir=None):
 class Adb:
     # 默认是木木模拟器
     __current_connect = "127.0.0.1:7555"
-    __shell_start = "shell "
-    __shell_end = ""
+    __shell_start = "shell \""
+    __shell_end = "\""
 
     @staticmethod
     def init_env():
@@ -75,8 +75,8 @@ class Adb:
             Adb.__shell_start = "shell \"su c"
             Adb.__shell_end = "\""
             return
-        Adb.__shell_start = "shell "
-        Adb.__shell_end = ""
+        Adb.__shell_start = "shell \""
+        Adb.__shell_end = "\""
 
 
     @staticmethod

@@ -36,7 +36,7 @@ adb shell 命令样式
 
 ```
 :: 1、最常见的样式
-adb shell ps
+adb shell ps  或 adb shell " ps "
 :: 2、部分手机
 adb shell "su -c ' ps '"
 :: 3、部分手机
