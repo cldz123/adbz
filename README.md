@@ -2,7 +2,7 @@
 
 #### 工具说明
 
-在分析Android的app过程中，需要大量的使用到 adb 命令，但是如果开多个模拟器时，运行每个adb命令都需要加 `-s xxxxx`，表示对哪个模拟器操作。比如在木木模拟器上执行 `ps`
+在分析 `Android` 的 `app` 过程中，需要大量的使用到 `adb` 命令，但是如果开多个模拟器时，运行每个adb命令都需要加 `-s xxxxx`，表示对哪个模拟器操作。比如在木木模拟器上执行 `ps`
 
 ```
 adb -s 127.0.0.1:7555 shell ps
@@ -30,7 +30,7 @@ adb -s 127.0.0.1:56555 shell ps
 adb -s 127.0.0.1:56555 shell cat /proc/xxx/maps
 ```
 
-adb shell 命令样式
+`adb shell` 命令样式
 
 目前遇到三种样式
 
@@ -47,7 +47,7 @@ adb shell "su c ps "
 
 #### 前期准备
 
-先下载到本地，并将工具目录加到 PATH 环境变量中。
+先下载到本地，并将工具目录加到 `PATH` 环境变量中。
 
 #### 命令使用
 
@@ -97,13 +97,13 @@ adbz shell "ps | grep sgame"
 
 ##### 4、dump 命令
 
-比如要dump 王者的 il2cpp 模块，运行如下命令
+比如要 `dump` 王者的 `il2cpp` 模块，运行如下命令
 
 ```
 adbz dump com.tencent.tmgp.sgame libil2cpp.so
 ```
 
-dump的分三步
+`dump` 的分三步
 - 找到进程id
 - 获取模块的起始地址和大小
 - 使用dd命令写入文件并pull下来
