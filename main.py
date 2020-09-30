@@ -9,9 +9,10 @@ import datetime
 import getopt
 import util
 from util import Adb
+from command import Command
 
 #改变标准输出的默认编码
-#sys.stdout=io.TextIOWrapper(sys.stdout.buffer, encoding='utf8')
+# sys.stdout=io.TextIOWrapper(sys.stdout.buffer, encoding='utf8')
 
 exe_state = False
 
@@ -29,7 +30,7 @@ def Usage():
     pass
 
 def Run():
-    opts, args = getopt.getopt(sys.argv[1:], "h:", ["help="])
+    opts, args = getopt.getopt(sys.argv[2:], "h:", ["help="])
     log.info("opts %s args:%s" %(opts, args))
     for op, value in opts:
         if op == "-h":
@@ -40,11 +41,20 @@ def Run():
     Adb.init_env()
 
     Adb.check()
-    if args[0] == "pull":
-        Adb.getcmd("pull /data/local/tmp/data")
-        pass
-    if args[0] == "push":
-        pass
+
+    current_cmd = sys.argv[1].lower()
+    current_cmd_arg = " ".join(sys.argv[2:])
+
+    if current_cmd == "pull":
+        return Command.pull(opts, args)
+    if current_cmd == "push":
+        return Command.push(opts, args)
+    if current_cmd == "shell":
+        return Command.shell(current_cmd_arg)
+    if current_cmd == "dump":
+        return Command.dump(args)
+    
+    log.info("unknown command:%s args:%s" % (current_cmd, current_cmd_arg))
     return False
 
 def Main():
@@ -78,11 +88,16 @@ def Main():
     
 
 if __name__ == "__main__":
+    log.MyLogger.instance().init()
     try:
+        log.info("python version:" + sys.version)
         # 强制设置编码格式为utf8
-        reload(sys)
-        sys.setdefaultencoding('utf-8')
-        log.MyLogger.instance().init()
+        if sys.version > '3':
+            import importlib, sys
+            importlib.reload(sys)
+        else:
+            reload(sys)
+            sys.setdefaultencoding('utf-8')
         Main()
     except Exception as e:
         print(e)

@@ -10,34 +10,47 @@ import glob
 import log
 
 def execute_cmd_impl(cmd, work_dir=None, stdout=None):
-    log.info("execute cmd -> '{}'".format(cmd))
-    log.info("work_dir -> {}".format( work_dir))
-    
+    if work_dir:
+        log.info("Exe Cmd -> '{}'   work_dir -> {}".format(cmd, work_dir))
+    else:
+        log.info("Exe Cmd -> '{}'".format(cmd))
     if (work_dir is None) or (os.path.isdir(work_dir) is False):
         work_dir = os.getcwd()
     process = subprocess.Popen(cmd, stdout=stdout, stderr=subprocess.PIPE, shell=True, cwd=work_dir)
-    ret = process.wait()
-    
-    # 输出错误信息到日志
-    for line in iter(process.stderr.readline, b""):
-        line_strip = line.strip('\r\n')
-        if line_strip != '':
-            log.error('Command error output -> {}'.format(line_strip))
-    
+    stdout_data, stderr_data = process.communicate()
+    ret = process.returncode
+    out_str_list = []
     # 根据返回值输出日志提示
     if ret != 0:
-        log.error('Execute command "{}" failed with return code {}'.format(cmd, ret))
+        # 输出错误信息到日志
+        out_str_list = get_cmd_output(stderr_data)
+        log.error(out_str_list)
+        log.error('Exe Cmd -> "{}" failed with return code {}'.format(cmd, ret))
     else:
-        log.info('Execute command "{}" success'.format(cmd))
-    return ret == 0, process.stdout
-    
+        out_str_list = get_cmd_output(stdout_data)
+        log.info(out_str_list)
+        log.info('Exe Cmd -> "{}" success'.format(cmd))
+    return ret == 0, out_str_list
+
+def get_cmd_output(data):
+    if not data:
+        return ""
+    try:
+        return data.decode("gbk")
+    except Exception as e:
+        try:
+            return data.decode("utf-8")
+        except Exception as e:
+            return data.decode("GB2312")
+    return ""
+
 def execute_cmd(cmd, work_dir=None):
     ret, _ = execute_cmd_impl(cmd, work_dir)
     return ret
 
 def execute_cmd_with_stdout(cmd, work_dir=None):
-    ret, stdout = execute_cmd_impl(cmd, work_dir, subprocess.PIPE)
-    return ret, stdout
+    ret, out_str_list = execute_cmd_impl(cmd, work_dir, subprocess.PIPE)
+    return ret, out_str_list
 
 class Adb:
     # 默认是木木模拟器
@@ -65,27 +78,29 @@ class Adb:
         Adb.__shell_start = "shell "
         Adb.__shell_end = ""
 
+
     @staticmethod
     def check():
         # 确认指定模拟器是否已经连接
         cmd = "adb devices"
-        ret, pipe = execute_cmd_with_stdout(cmd)
+        ret, ret_strs = execute_cmd_with_stdout(cmd)
         if not ret:
             return False
-        cmd_res = pipe.readline().decode().rstrip('\r\n')
+        cmd_res = "".join(ret_strs)
         if Adb.__current_connect not in cmd_res:
             cmd = "adb connect " + Adb.__current_connect
-            ret, pipe = execute_cmd_with_stdout(cmd)
+            ret, ret_strs = execute_cmd_with_stdout(cmd)
             if not ret:
                 return False
-            if pipe.readline().startswith("cannot connect to"):
+            cmd_res = "".join(ret_strs)
+            if cmd_res.startswith("cannot connect to"):
                 log.error("connect " + Adb.__current_connect + " fail")
                 return False
         return True
         
     @staticmethod
     def getcmd(cmd):
-        connect_str = " -s " + Adb.__current_connect if "" != Adb.__current_connect else ""
+        connect_str = "-s " + Adb.__current_connect if "" != Adb.__current_connect else ""
         cmd_str = "adb " + connect_str + " " + cmd
         log.info("adb cmd:%s" % cmd_str)
         return cmd_str
@@ -95,5 +110,4 @@ class Adb:
         connect_str = " -s " + Adb.__current_connect if "" != Adb.__current_connect else ""
         cmd_str = Adb.__shell_start + cmd + Adb.__shell_end
         cmd_str = "adb " + connect_str + " " + cmd_str
-        log.info("adb cmd:%s" % cmd_str)
         return cmd_str

@@ -66,49 +66,71 @@ def GetLogger():
     logger = MyLogger.instance()
     return logger.GetMyLogger()
 
-def get_file_name():
-    stack = traceback.extract_stack()
-    return stack[-3][2]
-    
+
+def get_stack_info():
+    stack_list = traceback.extract_stack()
+    cur_stack = stack_list[-4]
+
+    res = ""
+    if sys.version > '3':
+        # res = res + cur_stack.filename + " "
+        res = res + cur_stack.name + " "
+        res = res + "%03d" % cur_stack.lineno
+        # res = res + cur_stack.line + " "
+    else:
+        # res = res + cur_stack[0] + " "
+        res = res + cur_stack[2] + " "
+        res = res + "%03d" % cur_stack[1]
+        # res = res + cur_stack[3]+ " "
+    return res
+
+def GetLoggedStringList(log_str):
+    stack_info = get_stack_info()
+    if type(log_str) == type([]):
+        log_str = "\n".join(log_str)
+    if type(log_str) == type(""):
+        log_str_list = log_str.strip().split("\n")
+        return [("[%s] %s" % (stack_info, log.strip())) for log in log_str_list]
+    return ""
+
 def info(log_str):
     if GetLogger():
-        GetLogger().info("[%s] %s" % (get_file_name(), log_str))
+        log_list = GetLoggedStringList(log_str)
+        for log in log_list:
+            GetLogger().info(log)
 
 def error(log_str):
     if GetLogger():
-        GetLogger().error("[%s] %s" % (get_file_name(), log_str))
+        log_list = GetLoggedStringList(log_str)
+        for log in log_list:
+            GetLogger().error(log)
         
 def debug(log_str):
     if GetLogger():
-        GetLogger().debug("[%s] %s" % (get_file_name(), log_str))
+        log_list = GetLoggedStringList(log_str)
+        for log in log_list:
+            GetLogger().debug(log)
 
 def warning(log_str):
     if GetLogger():
-        GetLogger().warning("[%s] %s" % (get_file_name(), log_str))
+        log_list = GetLoggedStringList(log_str)
+        for log in log_list:
+            GetLogger().warning(log)
 
 def warn(log_str):
     if GetLogger():
-        GetLogger().warning("[%s] %s" % (get_file_name(), log_str))
+        log_list = GetLoggedStringList(log_str)
+        for log in log_list:
+            GetLogger().warning(log)
 
 def critical(log_str):
     if GetLogger():
-        GetLogger().critical("[%s] %s" % (get_file_name(), log_str))
-        
+        log_list = GetLoggedStringList(log_str)
+        for log in log_list:
+            GetLogger().critical(log)
+   
 def exception(log_str):
     if GetLogger():
-        GetLogger().exception("[%s] %s" % (get_file_name(), log_str))
-
-
-
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
+        log_list = GetLoggedStringList(log_str)
+        for log in log_list:
+            GetLogger().exception(log)
