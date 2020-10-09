@@ -84,53 +84,55 @@ def get_stack_info():
         # res = res + cur_stack[3]+ " "
     return res
 
-def GetLoggedStringList(log_str):
-    stack_info = get_stack_info()
+def GetLoggedStringList(log_str, file_name):
+    stack_info = ""
+    if file_name:
+        stack_info = "[%s] " % get_stack_info()
     if type(log_str) == type([]):
         log_str = "\n".join(log_str)
     if type(log_str) == type(""):
         log_str_list = log_str.strip().split("\n")
-        return [("[%s] %s" % (stack_info, log.strip())) for log in log_str_list]
+        return [("%s%s" % (stack_info, log.strip())) for log in log_str_list]
     return ""
 
-def info(log_str):
+def info(log_str, file_name = True):
     if GetLogger():
-        log_list = GetLoggedStringList(log_str)
+        log_list = GetLoggedStringList(log_str, file_name)
         for log in log_list:
             GetLogger().info(log)
 
-def error(log_str):
+def error(log_str, file_name = True):
     if GetLogger():
-        log_list = GetLoggedStringList(log_str)
+        log_list = GetLoggedStringList(log_str, file_name)
         for log in log_list:
             GetLogger().error(log)
         
-def debug(log_str):
+def debug(log_str, file_name = True):
     if GetLogger():
-        log_list = GetLoggedStringList(log_str)
+        log_list = GetLoggedStringList(log_str, file_name)
         for log in log_list:
             GetLogger().debug(log)
 
-def warning(log_str):
+def warning(log_str, file_name = True):
     if GetLogger():
-        log_list = GetLoggedStringList(log_str)
+        log_list = GetLoggedStringList(log_str, file_name)
         for log in log_list:
             GetLogger().warning(log)
 
-def warn(log_str):
+def warn(log_str, file_name = True):
     if GetLogger():
-        log_list = GetLoggedStringList(log_str)
+        log_list = GetLoggedStringList(log_str, file_name)
         for log in log_list:
             GetLogger().warning(log)
 
-def critical(log_str):
+def critical(log_str, file_name = True):
     if GetLogger():
-        log_list = GetLoggedStringList(log_str)
+        log_list = GetLoggedStringList(log_str, file_name)
         for log in log_list:
             GetLogger().critical(log)
    
-def exception(log_str):
+def exception(log_str, file_name = True):
     if GetLogger():
-        log_list = GetLoggedStringList(log_str)
+        log_list = GetLoggedStringList(log_str, file_name)
         for log in log_list:
             GetLogger().exception(log)
