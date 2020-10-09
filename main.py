@@ -91,8 +91,9 @@ if __name__ == "__main__":
     log.MyLogger.instance().init()
     try:
         log.info("python version:" + sys.version)
+        log.info({})
         # 强制设置编码格式为utf8
-        if sys.version > '3':
+        if sys.version_info.major >= 3:
             import importlib, sys
             importlib.reload(sys)
         else:

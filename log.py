@@ -72,7 +72,7 @@ def get_stack_info():
     cur_stack = stack_list[-4]
 
     res = ""
-    if sys.version > '3':
+    if sys.version_info.major >= 3:
         # res = res + cur_stack.filename + " "
         res = res + cur_stack.name + " "
         res = res + "%03d" % cur_stack.lineno
@@ -93,6 +93,7 @@ def GetLoggedStringList(log_str, file_name):
     if type(log_str) == type(""):
         log_str_list = log_str.strip().split("\n")
         return [("%s%s" % (stack_info, log.strip())) for log in log_str_list]
+    error("unkown log type:%s %s" % (type(log_str), str(log_str)))
     return ""
 
 def info(log_str, file_name = True):

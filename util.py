@@ -1,6 +1,7 @@
 #--*-- coding:utf-8 --*--
 import os
 import re
+import sys
 import shutil
 import zipfile
 import subprocess
@@ -24,11 +25,17 @@ def execute_cmd_impl(cmd, work_dir=None, stdout=None):
     if ret != 0:
         # 输出错误信息到日志
         out_str_list = get_cmd_output(stderr_data)
-        log.error(out_str_list.encode("gbk"), False)
+        if sys.version_info.major >= 3:
+            log.error(out_str_list, False)
+        else:
+            log.error(out_str_list.encode("gbk"), False)
         log.error("Exe Cmd -> '{}' failed with return code {}".format(cmd, ret))
     else:
         out_str_list = get_cmd_output(stdout_data)
-        log.info(out_str_list.encode("gbk"), False)
+        if sys.version_info.major >= 3:
+            log.info(out_str_list, False)
+        else:
+            log.info(out_str_list.encode("gbk"), False)
         log.info("Exe Cmd -> '{}' success".format(cmd))
     return ret == 0, out_str_list
 
