@@ -30,29 +30,36 @@ def Usage():
     pass
 
 def Run():
-    opts, args = getopt.getopt(sys.argv[2:], "h:", ["help="])
-    log.info("opts %s args:%s" %(opts, args))
-    for op, value in opts:
-        if op == "-h":
-            Usage()
-            return
-        log.info("op:%s value:%s" % (op, value))
-
     Adb.init_env()
-
     Adb.check()
 
     current_cmd = sys.argv[1].lower()
     current_cmd_arg = " ".join(sys.argv[2:])
-
+    if current_cmd == "help":
+        Usage()
+        return True
     if current_cmd == "pull":
-        return Command.pull(opts, args)
+        return Command.pull(sys.argv[2:])
     if current_cmd == "push":
-        return Command.push(opts, args)
+        return Command.push(sys.argv[2:])
     if current_cmd == "shell":
         return Command.shell(current_cmd_arg)
     if current_cmd == "dump":
-        return Command.dump(args)
+        return Command.dump(sys.argv[2:])
+    if current_cmd == "module" or current_cmd == "mod":
+        return Command.module(sys.argv[2:])
+    if current_cmd == "process":
+        return Command.process(sys.argv[2:])
+    if current_cmd == "inject":
+        return Command.inject(sys.argv[2:])
+    if current_cmd == "dolua":
+        return Command.dolua(sys.argv[2:])
+    if current_cmd == "lua":
+        return Command.loadlua(sys.argv[2:])
+    if current_cmd == "unlua":
+        return Command.unloadlua(sys.argv[2:])
+    if current_cmd == "uninject":
+        return Command.uninject(sys.argv[2:])
     
     log.info("unknown command:%s args:%s" % (current_cmd, current_cmd_arg))
     return False

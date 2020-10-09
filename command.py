@@ -1,171 +1,407 @@
 #--*-- coding:utf-8 --*--
 
 import os
+import sys
 import log
 import util
-
+import getopt
 class Command:
     
     # 命令执行的一些配置
-
+    '''
+    pull 拉取文件
+    adbz pull -r remote-file  [-l local_path] [-n local_name]
+    '''
     @staticmethod
-    def pull(opts, args):
-        log.info(str(args))
+    def pull(cmd_args):
+        opts, args = getopt.getopt(cmd_args, "r:l:n:", ["remote-file=", "local-path=", "local-name="])
+        log.info("opts %s args:%s" %(opts, args))
+        remote_file, local_path, local_name = "", "", ""
+        for op, value in opts:
+            if op == "-r" or op == "--remote-file":
+                remote_file = value
+            elif op == "-l" or op == "--local-path":
+                local_path = value
+            elif op == "-n" or op == "--local-name":
+                local_name = value
+            else:
+                log.error("unkown opt:%s value:%s" % (op, value))
+                return False
+        
+        if local_path == "":
+            local_path = "./"
+        if not os.path.exists(local_path):
+            os.makedirs(local_path)
+        if util.Adb.check_dir(remote_file):
+            # 目录
+            local_file = local_path + "/"
+        else:
+            remote_fname = os.path.basename(remote_file)
+            if local_name == "":
+                local_name = remote_fname
+            local_file = os.path.join(local_path, local_name)
+
+        log.info("remote:%s local:%s" % (remote_file, local_file))
+        shell_cmd = util.Adb.getcmd('pull "%s" "%s"' % (remote_file, local_file))
+        ret, res_str = util.execute_cmd_with_stdout(shell_cmd)
+        if not ret:
+            return False
         return True
+
+    '''
+    push 上传文件
+    adbz push -l local_path [-r remote_path] [-n remote_name]
+    '''
+    @staticmethod
+    def push(cmd_args):
+        opts, args = getopt.getopt(cmd_args, "l:r:n:", ["local-file=", "remote-path=", "remote-name="])
+        log.info("opts %s args:%s" %(opts, args))
+        local_file, remote_path, remote_name = "", "", ""
+        for op, value in opts:
+            if op == "-l" or op == "--local-file":
+                local_file = value
+            elif op == "-r" or op == "--remote-path":
+                remote_path = value
+            elif op == "-n" or op == "--remote-name":
+                remote_name = value
+            else:
+                log.error("unkown opt:%s value:%s" % (op, value))
+                return False
     
-    @staticmethod
-    def push(opts, args):
-        log.info(str(args))
+        if remote_path == "":
+            remote_path = "/data/local/tmp"
+        if os.path.isdir(local_file):
+            # push 目录
+            remote_file = remote_path + "/"
+            util.Adb.mkdir(remote_file)
+        else:
+            # push 文件
+            # local_path = os.path.dirname(local_file)
+            local_fname = os.path.basename(local_file)
+            if remote_name == "":
+                remote_name = local_fname
+            remote_file = remote_path + "/" + remote_name
 
+        log.info("local:%s remote:%s" % (local_file, remote_file))
+        shell_cmd = util.Adb.getcmd('push "%s" "%s"' % (local_file, remote_file))
+        ret, res_str = util.execute_cmd_with_stdout(shell_cmd)
+        if not ret:
+            return False
         return True
-
+ 
+    '''
+    执行shell命令
+    adbz shell ps
+    adbz shell "ps | grep sgame"
+    '''
     @staticmethod
     def shell(args):
         shell_cmd = util.Adb.getshell(args)
         log.info(shell_cmd)
-        util.execute_cmd(shell_cmd)
-        return True
+        return util.execute_cmd(shell_cmd)
 
+    '''
+    dump 模块或内存
+    1、adbz dump -p com.tencent.tmgp.sgame -m libil2cpp.so [-n file_name] [-c cbs]
+    2、adbz dump -p com.tencent.tmgp.sgame -b base_addr -s size [-n file_name] [-c cbs]
+    '''
     @staticmethod
-    def get_process_id(process_name):
-        # 获取进程id
-        shell_cmd = util.Adb.getshell("ps | grep %s" % process_name)
-        ret, res_str = util.execute_cmd_with_stdout(shell_cmd)
-        if not ret:
-            return ""
-        if process_name not in res_str:
-            shell_cmd = util.Adb.getshell("ps -A | grep %s" % process_name)
-            ret, res_str = util.execute_cmd_with_stdout(shell_cmd)
-            if not ret:
-                return ""
-        if process_name not in res_str:
-            return ""
-        res_str_list = res_str.split("\n")
-        process_info = []
-        for res_str in res_str_list:
-            process_line = [r.strip() for r in res_str.split(" ") if r.strip() != ""]
-            if process_name in process_line:
-                process_info = process_line
-        if 2 >= len(process_info):
-            return ""
-        return process_info[1]
-
-    @staticmethod
-    def dump(args):
-        if 2 != len(args):
+    def dump(cmd_args):
+        opts, args = getopt.getopt(cmd_args, "p:m:b:s:n:c:e:", ["process=", "module=", "base=", "end=", "size=", "name=", "cbs="])
+        log.info("opts %s args:%s" %(opts, args))
+        process_name, module_name, file_name = "", "", ""
+        base_addr, end_addr, mem_size = 0, 0, 0
+        cbs = 1
+        for op, value in opts:
+            if op == "-p" or op == "--process":
+                process_name = value
+            elif op == "-m" or op == "--module":
+                module_name = value
+            elif op == "-b" or op == "--base":
+                base_addr = int(value, 16)
+            elif op == "-e" or op == "--end":
+                base_addr = int(value, 16)
+            elif op == "-s" or op == "--size":
+                mem_size = int(value, 16)
+            elif op == "-n" or op == "--name":
+                file_name = value
+            elif op == "-c" or op == "--cbs":
+                cbs = int(value, 16)
+            else:
+                log.error("unkown opt:%s value:%s" % (op, value))
+                return False
+        # check args
+        if cbs <= 0:
+            log.error("error cbs:%d" % cbs)
             return False
-        process_name = args[0]
-        module_name = args[1]
+        if process_name == "" or (module_name == "" and base_addr == 0):
+            log.error("error args:")
+            return False
 
         # 获取进程id
-        process_id = Command.get_process_id(process_name)
+        process_id = util.Adb.get_process_id(process_name)
         if "" == process_id:
+            log.error("get process:%s id fail" % process_name)
             return False
 
-        # 获取模块信息 基地址和大小
-        shell_cmd = util.Adb.getshell("cat /proc/%s/maps | grep %s" % (process_id, module_name))
-        ret, res_str = util.execute_cmd_with_stdout(shell_cmd)
-        if not ret:
-            return False
-        if module_name not in res_str:
-            log.info("未找到模块")
-            return False
-        # 解析模块信息，可能存在多模块的情况，需要处理下
-        res_str_list = res_str.split("\n")
-        module_info_list = []
-        last_module_info = []
-        base_module_info = []
-        def AddToModuleInfoList(bm, lm):
-            module_info = []
-            module_info.append(bm[0])
-            module_info.append(lm[1])
-            module_info.append(lm[2])
-            module_info_list.append(module_info)
+        # dump 内存
+        if base_addr != 0:
+            if mem_size == 0: mem_size = end_addr - base_addr
+            module_save_name = file_name if file_name != "" else "%08X" % base_addr
+            return util.Adb.dump(process_id, base_addr, mem_size, cbs, module_save_name)
 
-        for res_str in res_str_list:
-            module_elem_info = [r.strip() for r in res_str.split(" ") if r.strip() != ""]
-            if 5 >= len(module_elem_info):
-                continue
-            address_list =  module_elem_info[0].split("-")
-            if 2 != len(address_list):
-                continue
-            address_list.append(module_elem_info[5])
-            if len(last_module_info) == 0:
-                last_module_info = address_list
-                base_module_info = address_list
-                continue
-            if last_module_info[1] == address_list[0]:
-                last_module_info = address_list
-                continue
-            AddToModuleInfoList(base_module_info, last_module_info) 
-            base_module_info = address_list
-            last_module_info = address_list
-
-        AddToModuleInfoList(base_module_info, last_module_info)
+        # 获取模块信息
+        mi_list = util.Adb.get_module_infos(process_id, module_name)
+        if 0 == len(mi_list):
+            log.error("get process:%s module:%s fail" % (process_name, module_name))
+            return False
 
         # 模块dump
-        multi_module = (len(module_info_list) != 1)
-        for mi in module_info_list:
+        multi_module = (len(mi_list) != 1)
+        for mi in mi_list:
             # 得到模块起始地址和结束地址，计算大小
             module_size = (int(mi[1], 16) - int(mi[0], 16))
             module_base = int(mi[0], 16)
-            module_name_elems = os.path.splitext(module_name)
-            module_save_name = module_name
+            module_save_name = file_name if file_name != "" else module_name
             if multi_module:
+                module_name_elems = os.path.splitext(module_save_name)
                 if len(module_name_elems) > 1:
                     module_save_name = "".join(module_name_elems[:-1]) + "_" + mi[0] + module_name_elems[-1]
                 else:
                     module_save_name = module_save_name + "_" + mi[0]
-            log.info("base:%08x size:%08x name:%s" % (module_base, module_size, module_save_name))
-            cbs = 1
-            if module_size > 0x10000:
-                cbs = 1024
-                while True:
-                    if module_size % cbs:
-                        cbs = cbs // 4
-                    else:
-                        break
-            module_size = module_size // cbs
-            # dd if=/proc/32909/mem skip=2589069312 count=274432 bs=1 of=/data/local/tmp/1
-            shell_cmd = util.Adb.getshell("dd if=/proc/%s/mem skip=%d count=%d bs=%s of=/data/local/tmp/%s" % (process_id, module_base, module_size, cbs, module_save_name))
-            ret, res_str = util.execute_cmd_with_stdout(shell_cmd)
-            if not ret:
-                return False
-            shell_cmd = util.Adb.getcmd("pull /data/local/tmp/%s %s" % (module_save_name, module_save_name))
-            ret, res_str = util.execute_cmd_with_stdout(shell_cmd)
-            if not ret:
-                return False
-            shell_cmd = util.Adb.getshell("rm -rf /data/local/tmp/%s" % module_save_name)
-            ret, res_str = util.execute_cmd_with_stdout(shell_cmd)
-            if not ret:
+            if not util.Adb.dump(process_id, module_base, module_size, cbs, module_save_name):
                 return False
         return True
     
+    '''
+    查看进程的模块信息
+    adbz moudle -p process_name [-m moudle_name]
+    '''
     @staticmethod
-    def module():
+    def module(cmd_args):
+        opts, args = getopt.getopt(cmd_args, "p:m:", ["process=", "module="])
+        log.info("opts %s args:%s" %(opts, args))
+        process_name, module_name = "", ""
+        for op, value in opts:
+            if op == "-p" or op == "--process":
+                process_name = value
+            elif op == "-m" or op == "--module":
+                module_name = value
+            else:
+                log.error("unkown opt:%s value:%s" % (op, value))
+                return False
         # 获取进程id
-        process_id = Command.get_process_id(process_name)
+        process_id = util.Adb.get_process_id(process_name)
         if "" == process_id:
+            log.error("get process:%s id fail" % process_name)
             return False
-
+        # 获取模块信息
+        if module_name != "":
+            module_name = " | grep %s" % module_name
+        shell_cmd = util.Adb.getshell("cat /proc/%s/maps%s" % (process_id, module_name))
+        ret, res_str = util.execute_cmd_with_stdout(shell_cmd)
+        if not ret:
+            return False
         return True
 
+    '''
+    查看进程信息 信息汇总
+    adbz moudle -p process_name [-m moudle_name]
+    '''
     @staticmethod
-    def process():
+    def process(cmd_args):
+        opts, args = getopt.getopt(cmd_args, "p:m:", ["process=", "module="])
+        log.info("opts %s args:%s" %(opts, args))
+        process_name = ""
+        for op, value in opts:
+            if op == "-p" or op == "--process":
+                process_name = value
+            else:
+                log.error("unkown op:%s value:%s" % (op, value))
+                return False
+        if process_name == "":
+            process_name = args[0]
+
+        # 获取进程id
+        process_id = util.Adb.get_process_id(process_name)
+        if "" == process_id:
+            log.error("get process:%s id fail" % process_name)
+            return False
+        # 查看 status
+        shell_cmd = util.Adb.getshell("cat /proc/%s/status" % process_id)
+        ret, res_str = util.execute_cmd_with_stdout(shell_cmd)
+        if not ret:
+            return False
+        # 查看 cmdline
+        shell_cmd = util.Adb.getshell("cat /proc/%s/cmdline" % process_id)
+        ret, res_str = util.execute_cmd_with_stdout(shell_cmd)
+        if not ret:
+            return False
+        # 查看 cmdline
+        shell_cmd = util.Adb.getshell("cat /proc/%s/stat" % process_id)
+        ret, res_str = util.execute_cmd_with_stdout(shell_cmd)
+        if not ret:
+            return False
+        # 查看进程文件信息
+        shell_cmd = util.Adb.getshell("ls -l /proc/%s/fd/" % process_id)
+        ret, res_str = util.execute_cmd_with_stdout(shell_cmd)
+        if not ret:
+            return False
+        # 查看进程的内存信息
+        shell_cmd = util.Adb.getshell("cat /proc/%s/statm" % process_id)
+        ret, res_str = util.execute_cmd_with_stdout(shell_cmd)
+        if not ret:
+            return False
+        # 查看环境变量
+        shell_cmd = util.Adb.getshell("cat /proc/%s/environ" % process_id)
+        ret, res_str = util.execute_cmd_with_stdout(shell_cmd)
+        if not ret:
+            return False
+        return True
+
+    __client_mod_name = "libclient.so"
+    __client_fake_name = "libloader2.so"
+    __loader_name = "loader"
+    __remote_path = "/data/local/tmp/"
+    __tool_local_path = os.path.join(sys.path[0], "tools", "analyze")
+    __load_client_script = "load_client.lua"
+    # 模块注入
+    '''
+    '''
+    @staticmethod
+    def inject(cmd_args):
+        opts, args = getopt.getopt(cmd_args, "p:m:", ["process=", "module="])
+        log.info("opts %s args:%s" %(opts, args))
         pass
 
-    
-    # 模块注入 
     @staticmethod
-    def inject():
-        pass
+    def upload_tools(abi, x86_arm):
+        remote_path = Command.__remote_path + abi + "/"
+        if not util.Adb.check_dir(remote_path):
+            util.Adb.mkdir(remote_path)
+        # 上传loader
+        local_loader = os.path.join(Command.__tool_local_path, abi, Command.__loader_name)
+        shell_cmd = util.Adb.getcmd('push "%s" "%s"' % (local_loader, remote_path))
+        if not util.execute_cmd(shell_cmd):
+            return False
+        if x86_arm:
+            # 上传 loader.so
+            local_inject_so = os.path.join(Command.__tool_local_path, abi, Command.__client_fake_name)
+            shell_cmd = util.Adb.getcmd('push "%s" "%s"' % (local_inject_so, remote_path))
+            if not util.execute_cmd(shell_cmd):
+                return False
+            shell_cmd = util.Adb.getshell('chmod 777  "%s"/*' % remote_path)
+            if not util.execute_cmd(shell_cmd):
+                return False
+            # 创建目录
+            remote_path = Command.__remote_path + "armeabi-v7a" + "/"
+            if not util.Adb.check_dir(remote_path):
+                util.Adb.mkdir(remote_path)
+            # 上传client
+            local_client = os.path.join(Command.__tool_local_path, "armeabi-v7a", Command.__client_mod_name)
+            shell_cmd = util.Adb.getcmd('push "%s" "%s"' % (local_client, remote_path))
+            if not util.execute_cmd(shell_cmd):
+                return False
+            # 上传 load script
+            load_client_script = os.path.join(Command.__tool_local_path, Command.__load_client_script)
+            shell_cmd = util.Adb.getcmd('push "%s" "%s"' % (load_client_script, Command.__remote_path))
+            if not util.execute_cmd(shell_cmd):
+                return False
+        else:
+            # 上传client
+            local_client = os.path.join(Command.__tool_local_path, abi, Command.__client_mod_name)
+            shell_cmd = util.Adb.getcmd('push "%s" "%s"' % (local_client, remote_path))
+            if not util.execute_cmd(shell_cmd):
+                return False
+        shell_cmd = util.Adb.getshell('chmod 777  "%s"/*' % remote_path)
+        if not util.execute_cmd(shell_cmd):
+            return False
+        return True
+
+
+    @staticmethod
+    def inject(pid, abi, need_push = False, x86_arm = False, zygote = False):
+        # 上传各个模块
+        if need_push : Command.upload_tools(abi, x86_arm)
+        remote_loader = Command.__remote_path + abi + "/" + Command.__loader_name
+        remote_inject_so = Command.__remote_path + abi + "/" + Command.__client_mod_name
+        remote_client = Command.__remote_path + "armeabi-v7a/" + Command.__client_mod_name
+        remote_script = Command.__remote_path + Command.__load_client_script
+        if x86_arm:
+            remote_inject_so = Command.__remote_path + abi + "/" + Command.__client_fake_name
+        shell_cmd = '"%s" inject --so="%s" --script="%s" --zygote --x86_arm' % (remote_loader, remote_inject_so, remote_script)
+        if x86_arm:
+            shell_cmd = shell_cmd + " --x86_arm"
+        if zygote:
+            shell_cmd = shell_cmd + " --zygote"
+            shell_cmd = shell_cmd + " --pid " + util.Adb.get_process_id("zygote")
+        else:
+            shell_cmd = shell_cmd + " --pid " + pid
+        shell_cmd = util.Adb.getshell(shell_cmd)
+        log.info("inject cmd %s" % shell_cmd)
+        if not util.execute_cmd(shell_cmd):
+            return False
+        return False
+
 
     # 执行Lua脚本
+    '''
+    adbz dolua -p process_name -s lua_script_name -f lua_func_name
+    '''
     @staticmethod
-    def do_lua():
+    def dolua(cmd_args):
+        opts, args = getopt.getopt(cmd_args, "p:s:f:", ["process=", "script=", "func="])
+        log.info("opts %s args:%s" %(opts, args))
+        lua_script_name, func_name, process_name = "", "", ""
+        x86_arm = True
+        for op, value in opts:
+            if op == "-s" or op == "--script":
+                lua_script_name = value
+            elif op == "-f" or op == "--func":
+                func_name = value
+            elif op == "-p" or op == "--process":
+                process_name = value
+            else:
+                log.error("unkown opt:%s value:%s" % (op, value))
+                return False
+        # 1、获取进程id
+        process_id = util.Adb.get_process_id(process_name)
+        if "" == process_id:
+            log.error("get process:%s id fail" % process_name)
+            return False
+        # 2、判断client.so是否已经注入
+        if not util.Adb.check_module_exist(process_id, "libclient.so"):
+            log.warn("libclient.so not in process")
+            if not Command.inject(process_id, "x86", True, True):
+                return False
+
+        # 3、loader 通知 client 调用 指定 lua 脚本的函数
+        remote_loader = Command.__remote_path + abi + "/" + Command.__loader_name
+        remote_inject_so = Command.__remote_path + abi + "/" + Command.__client_mod_name
+        if x86_arm:
+            remote_inject_so = Command.__remote_path + abi + "/" + Command.__client_fake_name
+
+        shell_cmd = '"%s" dolua --so="%s" --script="%s" --func="%s"' % (remote_loader, remote_inject_so, lua_script_name, func_name)
+        log.info("do cmd %s" % shell_cmd)
+        if not util.execute_cmd(shell_cmd):
+            return False
+        return True
+
+    @staticmethod
+    def loadlua(cmd_args):
+        opts, args = getopt.getopt(cmd_args, "p:m:", ["process=", "module="])
+        log.info("opts %s args:%s" %(opts, args))
+        pass
+    
+    @staticmethod
+    def unloadlua(cmd_args):
+        opts, args = getopt.getopt(cmd_args, "p:m:", ["process=", "module="])
+        log.info("opts %s args:%s" %(opts, args))
         pass
 
     # 模块卸载
     @staticmethod
-    def uninject():
+    def uninject(cmd_args):
+        opts, args = getopt.getopt(cmd_args, "p:m:", ["process=", "module="])
+        log.info("opts %s args:%s" %(opts, args))
         pass
