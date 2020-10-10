@@ -18,11 +18,11 @@ def execute_cmd_impl(cmd, work_dir=None, stdout=None):
     log.info(cmd, False)
     process = subprocess.Popen(cmd, stdout=stdout, stderr=subprocess.PIPE, shell=True, cwd=work_dir)
     stdout_data, stderr_data = process.communicate()
-    ret = (len(stderr_data) == 0) # process.returncode
+    ret = process.returncode # (len(stderr_data) == 0) # 
     out_str_list = []
     
     # 根据返回值输出日志提示
-    if not ret:
+    if ret:
         # 输出错误信息到日志
         out_str_list = get_cmd_output(stderr_data)
         if sys.version_info.major >= 3:
@@ -37,7 +37,7 @@ def execute_cmd_impl(cmd, work_dir=None, stdout=None):
         else:
             log.info(out_str_list.encode("gbk"), False)
         log.info("Exe Cmd -> '{}' success".format(cmd))
-    return ret, out_str_list
+    return ret == 0, out_str_list
 
 def get_cmd_output(data):
     if not data:

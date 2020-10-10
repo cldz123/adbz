@@ -27,6 +27,8 @@ class Command:
             else:
                 log.error("unkown opt:%s value:%s" % (op, value))
                 return False
+        if len(opts) == 0 and len(args) != 0:
+            remote_file = args[0]
         
         if local_path == "":
             local_path = "./"
@@ -126,7 +128,7 @@ class Command:
             elif op == "-n" or op == "--name":
                 file_name = value
             elif op == "-c" or op == "--cbs":
-                cbs = int(value, 16)
+                cbs = int(value, 10)
             else:
                 log.error("unkown opt:%s value:%s" % (op, value))
                 return False
