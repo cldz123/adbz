@@ -132,175 +132,174 @@ class Adb:
         cmd_str = "adb " + connect_str + " " + cmd_str
         return cmd_str
 
-    # 判断目录或者文件是否存在
-    @staticmethod
-    def check_exist(file):
-        cmd = Adb.getshell("ls " + file)
-        ret, ret_strs = execute_cmd_with_stdout(cmd)
-        if not ret:
-            return False
-        if "No such file or directory" not in ret_strs:
-            return True
-        return False
-    
-    @staticmethod
-    def check_dir(file):
-        cmd = Adb.getshell("file " + file)
-        ret, ret_strs = execute_cmd_with_stdout(cmd)
-        if not ret:
-            return False
-        if (file + ": directory") == ret_strs.strip():
-            return True
-        return False
 
-    @staticmethod
-    def check_file(file):
-        cmd = Adb.getshell("file " + file)
-        ret, ret_strs = execute_cmd_with_stdout(cmd)
-        if not ret:
-            return False
-        if (file + ": directory") == ret_strs.strip():
-            return True
-        return False
+def getcmd(cmd):
+    return Adb.getcmd(cmd)
 
-    # 创建目录
-    @staticmethod
-    def mkdir(dir):
-        cmd = Adb.getshell("mkdir -p " + dir)
-        ret, ret_strs = execute_cmd_with_stdout(cmd)
-        if not ret:
-            return False
+def getshell(cmd):
+    return Adb.getshell(cmd)
+
+# 判断目录或者文件是否存在
+def check_exist(file):
+    cmd = Adb.getshell("ls " + file)
+    ret, ret_strs = execute_cmd_with_stdout(cmd)
+    if not ret:
+        return False
+    if "No such file or directory" not in ret_strs:
         return True
-    
-    # 辅助函数，用于获取对应进程的进程id
-    @staticmethod
-    def get_process_id(process_name):
-        # 获取进程id
-        shell_cmd = Adb.getshell("ps | grep %s" % process_name)
-        ret, res_str = execute_cmd_with_stdout(shell_cmd)
-        if not ret:
-            return ""
-        if process_name not in res_str:
-            shell_cmd = Adb.getshell("ps -A | grep %s" % process_name)
-            ret, res_str = execute_cmd_with_stdout(shell_cmd)
-            if not ret:
-                return ""
-        if process_name not in res_str:
-            return ""
-        res_str_list = res_str.split("\n")
-        pi_list = []
-        for res_str in res_str_list:
-            # 优先模糊查找
-            process_line = [r.strip() for r in res_str.split(" ") if r.strip() != ""]
-            if 0 == len(process_line): continue
-            # if process_name in process_line:
-            #     pi_list.append(process_line)
-            #     continue
-            if process_line[-1].endswith(process_name):
-                pi_list.append(process_line)
-                continue
-            if process_line[-1].startswith(process_name):
-                pi_list.append(process_line)
-                continue
+    return False
 
-        # 如果找到多个，则精准查找
-        if len(pi_list) != 1:
-            tmp_list = []
-            for pi in pi_list:
-                if pi[-1] == process_name:
-                    tmp_list.append(pi)
-            if len(tmp_list) != 0:
-                pi_list = tmp_list
-
-        # 判断是否找到多个进程
-        if len(pi_list) != 1:
-            log.warn("process_info size %d" % len(pi_list))
-            for pi in pi_list:
-                log.info("---- " + str(pi))
-            return ""
-        # 返回找到的pid
-        return pi_list[0][1]
-
-    # 获取模块信息
-    @staticmethod
-    def check_module_exist(pid, mname):
-        # 获取模块信息 基地址和大小
-        shell_cmd = Adb.getshell("cat /proc/%s/maps | grep %s" % (pid, mname))
-        ret, res_str = execute_cmd_with_stdout(shell_cmd)
-        if not ret:
-            return False
-        if mname not in res_str:
-            log.error("cannot find moudle:%s in process:%s" % (pid, mname))
-            return False
-        if res_str == "1":
-            return False
+def check_dir(file):
+    cmd = Adb.getshell("file " + file)
+    ret, ret_strs = execute_cmd_with_stdout(cmd)
+    if not ret:
+        return False
+    if (file + ": directory") == ret_strs.strip():
         return True
+    return False
 
-    # 获取模块信息
-    @staticmethod
-    def get_module_infos(pid, mname):
-        # 获取模块信息 基地址和大小
-        shell_cmd = Adb.getshell("cat /proc/%s/maps | grep %s" % (pid, mname))
+def check_file(file):
+    cmd = Adb.getshell("file " + file)
+    ret, ret_strs = execute_cmd_with_stdout(cmd)
+    if not ret:
+        return False
+    if (file + ": directory") == ret_strs.strip():
+        return True
+    return False
+
+# 创建目录
+def mkdir(dir):
+    cmd = Adb.getshell("mkdir -p " + dir)
+    ret, ret_strs = execute_cmd_with_stdout(cmd)
+    if not ret:
+        return False
+    return True
+
+# 辅助函数，用于获取对应进程的进程id
+def get_process_id(process_name):
+    # 获取进程id
+    shell_cmd = Adb.getshell("ps | grep %s" % process_name)
+    ret, res_str = execute_cmd_with_stdout(shell_cmd)
+    if not ret:
+        return ""
+    if process_name not in res_str:
+        shell_cmd = Adb.getshell("ps -A | grep %s" % process_name)
         ret, res_str = execute_cmd_with_stdout(shell_cmd)
         if not ret:
-            return []
-        if mname not in res_str:
-            log.error("cannot find moudle:%s in process:%s" % (pid, mname))
-            return []
+            return ""
+    if process_name not in res_str:
+        return ""
+    res_str_list = res_str.split("\n")
+    pi_list = []
+    for res_str in res_str_list:
+        # 优先模糊查找
+        process_line = [r.strip() for r in res_str.split(" ") if r.strip() != ""]
+        if 0 == len(process_line): continue
+        # if process_name in process_line:
+        #     pi_list.append(process_line)
+        #     continue
+        if process_line[-1].endswith(process_name):
+            pi_list.append(process_line)
+            continue
+        if process_line[-1].startswith(process_name):
+            pi_list.append(process_line)
+            continue
 
-        # 解析模块信息，可能存在多模块的情况，需要处理下
-        res_str_list = res_str.split("\n")
-        module_info_list = []
-        last_module_info = []
-        base_module_info = []
-        def AddToModuleInfoList(bm, lm):
-            module_info = []
-            module_info.append(bm[0])
-            module_info.append(lm[1])
-            module_info.append(lm[2])
-            module_info_list.append(module_info)
+    # 如果找到多个，则精准查找
+    if len(pi_list) != 1:
+        tmp_list = []
+        for pi in pi_list:
+            if pi[-1] == process_name:
+                tmp_list.append(pi)
+        if len(tmp_list) != 0:
+            pi_list = tmp_list
 
-        for res_str in res_str_list:
-            module_elem_info = [r.strip() for r in res_str.split(" ") if r.strip() != ""]
-            if 5 >= len(module_elem_info):
-                continue
-            address_list =  module_elem_info[0].split("-")
-            if 2 != len(address_list):
-                continue
-            address_list.append(module_elem_info[5])
-            if len(last_module_info) == 0:
-                last_module_info = address_list
-                base_module_info = address_list
-                continue
-            if last_module_info[1] == address_list[0]:
-                last_module_info = address_list
-                continue
-            AddToModuleInfoList(base_module_info, last_module_info) 
-            base_module_info = address_list
+    # 判断是否找到多个进程
+    if len(pi_list) != 1:
+        log.warn("process_info size %d" % len(pi_list))
+        for pi in pi_list:
+            log.info("---- " + str(pi))
+        return ""
+    # 返回找到的pid
+    return pi_list[0][1]
+
+# 获取模块信息
+def check_module_exist(pid, mname):
+    # 获取模块信息 基地址和大小
+    shell_cmd = Adb.getshell("cat /proc/%s/maps | grep %s" % (pid, mname))
+    ret, res_str = execute_cmd_with_stdout(shell_cmd)
+    if not ret:
+        return False
+    if mname not in res_str:
+        log.error("cannot find moudle:%s in process:%s" % (pid, mname))
+        return False
+    if res_str == "1":
+        return False
+    return True
+
+# 获取模块信息
+def get_module_infos(pid, mname):
+    # 获取模块信息 基地址和大小
+    shell_cmd = Adb.getshell("cat /proc/%s/maps | grep %s" % (pid, mname))
+    ret, res_str = execute_cmd_with_stdout(shell_cmd)
+    if not ret:
+        return []
+    if mname not in res_str:
+        log.error("cannot find moudle:%s in process:%s" % (pid, mname))
+        return []
+
+    # 解析模块信息，可能存在多模块的情况，需要处理下
+    res_str_list = res_str.split("\n")
+    module_info_list = []
+    last_module_info = []
+    base_module_info = []
+    def AddToModuleInfoList(bm, lm):
+        module_info = []
+        module_info.append(bm[0])
+        module_info.append(lm[1])
+        module_info.append(lm[2])
+        module_info_list.append(module_info)
+
+    for res_str in res_str_list:
+        module_elem_info = [r.strip() for r in res_str.split(" ") if r.strip() != ""]
+        if 5 >= len(module_elem_info):
+            continue
+        address_list =  module_elem_info[0].split("-")
+        if 2 != len(address_list):
+            continue
+        address_list.append(module_elem_info[5])
+        if len(last_module_info) == 0:
             last_module_info = address_list
+            base_module_info = address_list
+            continue
+        if last_module_info[1] == address_list[0]:
+            last_module_info = address_list
+            continue
+        AddToModuleInfoList(base_module_info, last_module_info) 
+        base_module_info = address_list
+        last_module_info = address_list
 
-        AddToModuleInfoList(base_module_info, last_module_info)
-        return module_info_list
-    
-    # dump 内存
-    @staticmethod
-    def dump(pid, mem_base, mem_size, cbs, file_name):
-        log.info("base:%08x size:%08x name:%s" % (mem_base, mem_size, file_name))
-        if (mem_size % cbs):
-            log.error("module size %d cbs:%d" % (mem_size, cbs))
-            return False
-        mem_size = mem_size // cbs
-        # dd if=/proc/32909/mem skip=2589069312 count=274432 bs=1 of=/data/local/tmp/1
-        shell_cmd = Adb.getshell("dd if=/proc/%s/mem skip=%d count=%d bs=%s of=/data/local/tmp/%s" % (pid, mem_base, mem_size, cbs, file_name))
-        ret, res_str = execute_cmd_with_stdout(shell_cmd)
-        if not ret:
-            return False
-        shell_cmd = Adb.getcmd("pull /data/local/tmp/%s %s" % (file_name, file_name))
-        ret, res_str = execute_cmd_with_stdout(shell_cmd)
-        if not ret:
-            return False
-        shell_cmd = Adb.getshell("rm -rf /data/local/tmp/%s" % file_name)
-        ret, res_str = execute_cmd_with_stdout(shell_cmd)
-        if not ret:
-            return False
-        return True
+    AddToModuleInfoList(base_module_info, last_module_info)
+    return module_info_list
+
+# dump 内存
+def dump(pid, mem_base, mem_size, cbs, file_name):
+    log.info("base:%08x size:%08x name:%s" % (mem_base, mem_size, file_name))
+    if (mem_size % cbs):
+        log.error("module size %d cbs:%d" % (mem_size, cbs))
+        return False
+    mem_size = mem_size // cbs
+    # dd if=/proc/32909/mem skip=2589069312 count=274432 bs=1 of=/data/local/tmp/1
+    shell_cmd = Adb.getshell("dd if=/proc/%s/mem skip=%d count=%d bs=%s of=/data/local/tmp/%s" % (pid, mem_base, mem_size, cbs, file_name))
+    ret, res_str = execute_cmd_with_stdout(shell_cmd)
+    if not ret:
+        return False
+    shell_cmd = Adb.getcmd("pull /data/local/tmp/%s %s" % (file_name, file_name))
+    ret, res_str = execute_cmd_with_stdout(shell_cmd)
+    if not ret:
+        return False
+    shell_cmd = Adb.getshell("rm -rf /data/local/tmp/%s" % file_name)
+    ret, res_str = execute_cmd_with_stdout(shell_cmd)
+    if not ret:
+        return False
+    return True

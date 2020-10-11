@@ -34,7 +34,7 @@ class Command:
             local_path = "./"
         if not os.path.exists(local_path):
             os.makedirs(local_path)
-        if util.Adb.check_dir(remote_file):
+        if util.check_dir(remote_file):
             # 目录
             local_file = local_path + "/"
         else:
@@ -44,7 +44,7 @@ class Command:
             local_file = os.path.join(local_path, local_name)
 
         log.info("remote:%s local:%s" % (remote_file, local_file))
-        shell_cmd = util.Adb.getcmd('pull "%s" "%s"' % (remote_file, local_file))
+        shell_cmd = util.getcmd('pull "%s" "%s"' % (remote_file, local_file))
         ret, res_str = util.execute_cmd_with_stdout(shell_cmd)
         if not ret:
             return False
@@ -75,7 +75,7 @@ class Command:
         if os.path.isdir(local_file):
             # push 目录
             remote_file = remote_path + "/"
-            util.Adb.mkdir(remote_file)
+            util.mkdir(remote_file)
         else:
             # push 文件
             # local_path = os.path.dirname(local_file)
@@ -85,7 +85,7 @@ class Command:
             remote_file = remote_path + "/" + remote_name
 
         log.info("local:%s remote:%s" % (local_file, remote_file))
-        shell_cmd = util.Adb.getcmd('push "%s" "%s"' % (local_file, remote_file))
+        shell_cmd = util.getcmd('push "%s" "%s"' % (local_file, remote_file))
         ret, res_str = util.execute_cmd_with_stdout(shell_cmd)
         if not ret:
             return False
@@ -98,7 +98,7 @@ class Command:
     '''
     @staticmethod
     def shell(args):
-        shell_cmd = util.Adb.getshell(args)
+        shell_cmd = util.getshell(args)
         log.info(shell_cmd)
         return util.execute_cmd(shell_cmd)
 
@@ -141,7 +141,7 @@ class Command:
             return False
 
         # 获取进程id
-        process_id = util.Adb.get_process_id(process_name)
+        process_id = util.get_process_id(process_name)
         if "" == process_id:
             log.error("get process:%s id fail" % process_name)
             return False
@@ -150,10 +150,10 @@ class Command:
         if base_addr != 0:
             if mem_size == 0: mem_size = end_addr - base_addr
             module_save_name = file_name if file_name != "" else "%08X" % base_addr
-            return util.Adb.dump(process_id, base_addr, mem_size, cbs, module_save_name)
+            return util.dump(process_id, base_addr, mem_size, cbs, module_save_name)
 
         # 获取模块信息
-        mi_list = util.Adb.get_module_infos(process_id, module_name)
+        mi_list = util.get_module_infos(process_id, module_name)
         if 0 == len(mi_list):
             log.error("get process:%s module:%s fail" % (process_name, module_name))
             return False
@@ -171,7 +171,7 @@ class Command:
                     module_save_name = "".join(module_name_elems[:-1]) + "_" + mi[0] + module_name_elems[-1]
                 else:
                     module_save_name = module_save_name + "_" + mi[0]
-            if not util.Adb.dump(process_id, module_base, module_size, cbs, module_save_name):
+            if not util.dump(process_id, module_base, module_size, cbs, module_save_name):
                 return False
         return True
     
@@ -193,14 +193,14 @@ class Command:
                 log.error("unkown opt:%s value:%s" % (op, value))
                 return False
         # 获取进程id
-        process_id = util.Adb.get_process_id(process_name)
+        process_id = util.get_process_id(process_name)
         if "" == process_id:
             log.error("get process:%s id fail" % process_name)
             return False
         # 获取模块信息
         if module_name != "":
             module_name = " | grep %s" % module_name
-        shell_cmd = util.Adb.getshell("cat /proc/%s/maps%s" % (process_id, module_name))
+        shell_cmd = util.getshell("cat /proc/%s/maps%s" % (process_id, module_name))
         ret, res_str = util.execute_cmd_with_stdout(shell_cmd)
         if not ret:
             return False
@@ -225,37 +225,37 @@ class Command:
             process_name = args[0]
 
         # 获取进程id
-        process_id = util.Adb.get_process_id(process_name)
+        process_id = util.get_process_id(process_name)
         if "" == process_id:
             log.error("get process:%s id fail" % process_name)
             return False
         # 查看 status
-        shell_cmd = util.Adb.getshell("cat /proc/%s/status" % process_id)
+        shell_cmd = util.getshell("cat /proc/%s/status" % process_id)
         ret, res_str = util.execute_cmd_with_stdout(shell_cmd)
         if not ret:
             return False
         # 查看 cmdline
-        shell_cmd = util.Adb.getshell("cat /proc/%s/cmdline" % process_id)
+        shell_cmd = util.getshell("cat /proc/%s/cmdline" % process_id)
         ret, res_str = util.execute_cmd_with_stdout(shell_cmd)
         if not ret:
             return False
         # 查看 cmdline
-        shell_cmd = util.Adb.getshell("cat /proc/%s/stat" % process_id)
+        shell_cmd = util.getshell("cat /proc/%s/stat" % process_id)
         ret, res_str = util.execute_cmd_with_stdout(shell_cmd)
         if not ret:
             return False
         # 查看进程文件信息
-        shell_cmd = util.Adb.getshell("ls -l /proc/%s/fd/" % process_id)
+        shell_cmd = util.getshell("ls -l /proc/%s/fd/" % process_id)
         ret, res_str = util.execute_cmd_with_stdout(shell_cmd)
         if not ret:
             return False
         # 查看进程的内存信息
-        shell_cmd = util.Adb.getshell("cat /proc/%s/statm" % process_id)
+        shell_cmd = util.getshell("cat /proc/%s/statm" % process_id)
         ret, res_str = util.execute_cmd_with_stdout(shell_cmd)
         if not ret:
             return False
         # 查看环境变量
-        shell_cmd = util.Adb.getshell("cat /proc/%s/environ" % process_id)
+        shell_cmd = util.getshell("cat /proc/%s/environ" % process_id)
         ret, res_str = util.execute_cmd_with_stdout(shell_cmd)
         if not ret:
             return False
@@ -279,43 +279,43 @@ class Command:
     @staticmethod
     def upload_tools(abi, x86_arm):
         remote_path = Command.__remote_path + abi + "/"
-        if not util.Adb.check_dir(remote_path):
-            util.Adb.mkdir(remote_path)
+        if not util.check_dir(remote_path):
+            util.mkdir(remote_path)
         # 上传loader
         local_loader = os.path.join(Command.__tool_local_path, abi, Command.__loader_name)
-        shell_cmd = util.Adb.getcmd('push "%s" "%s"' % (local_loader, remote_path))
+        shell_cmd = util.getcmd('push "%s" "%s"' % (local_loader, remote_path))
         if not util.execute_cmd(shell_cmd):
             return False
         if x86_arm:
             # 上传 loader.so
             local_inject_so = os.path.join(Command.__tool_local_path, abi, Command.__client_fake_name)
-            shell_cmd = util.Adb.getcmd('push "%s" "%s"' % (local_inject_so, remote_path))
+            shell_cmd = util.getcmd('push "%s" "%s"' % (local_inject_so, remote_path))
             if not util.execute_cmd(shell_cmd):
                 return False
-            shell_cmd = util.Adb.getshell('chmod 777  "%s"/*' % remote_path)
+            shell_cmd = util.getshell('chmod 777  "%s"/*' % remote_path)
             if not util.execute_cmd(shell_cmd):
                 return False
             # 创建目录
             remote_path = Command.__remote_path + "armeabi-v7a" + "/"
-            if not util.Adb.check_dir(remote_path):
-                util.Adb.mkdir(remote_path)
+            if not util.check_dir(remote_path):
+                util.mkdir(remote_path)
             # 上传client
             local_client = os.path.join(Command.__tool_local_path, "armeabi-v7a", Command.__client_mod_name)
-            shell_cmd = util.Adb.getcmd('push "%s" "%s"' % (local_client, remote_path))
+            shell_cmd = util.getcmd('push "%s" "%s"' % (local_client, remote_path))
             if not util.execute_cmd(shell_cmd):
                 return False
             # 上传 load script
             load_client_script = os.path.join(Command.__tool_local_path, Command.__load_client_script)
-            shell_cmd = util.Adb.getcmd('push "%s" "%s"' % (load_client_script, Command.__remote_path))
+            shell_cmd = util.getcmd('push "%s" "%s"' % (load_client_script, Command.__remote_path))
             if not util.execute_cmd(shell_cmd):
                 return False
         else:
             # 上传client
             local_client = os.path.join(Command.__tool_local_path, abi, Command.__client_mod_name)
-            shell_cmd = util.Adb.getcmd('push "%s" "%s"' % (local_client, remote_path))
+            shell_cmd = util.getcmd('push "%s" "%s"' % (local_client, remote_path))
             if not util.execute_cmd(shell_cmd):
                 return False
-        shell_cmd = util.Adb.getshell('chmod 777  "%s"/*' % remote_path)
+        shell_cmd = util.getshell('chmod 777  "%s"/*' % remote_path)
         if not util.execute_cmd(shell_cmd):
             return False
         return True
@@ -336,10 +336,10 @@ class Command:
             shell_cmd = shell_cmd + " --x86_arm"
         if zygote:
             shell_cmd = shell_cmd + " --zygote"
-            shell_cmd = shell_cmd + " --pid " + util.Adb.get_process_id("zygote")
+            shell_cmd = shell_cmd + " --pid " + util.get_process_id("zygote")
         else:
             shell_cmd = shell_cmd + " --pid " + pid
-        shell_cmd = util.Adb.getshell(shell_cmd)
+        shell_cmd = util.getshell(shell_cmd)
         log.info("inject cmd %s" % shell_cmd)
         if not util.execute_cmd(shell_cmd):
             return False
@@ -367,12 +367,12 @@ class Command:
                 log.error("unkown opt:%s value:%s" % (op, value))
                 return False
         # 1、获取进程id
-        process_id = util.Adb.get_process_id(process_name)
+        process_id = util.get_process_id(process_name)
         if "" == process_id:
             log.error("get process:%s id fail" % process_name)
             return False
         # 2、判断client.so是否已经注入
-        if not util.Adb.check_module_exist(process_id, "libclient.so"):
+        if not util.check_module_exist(process_id, "libclient.so"):
             log.warn("libclient.so not in process")
             if not Command.inject(process_id, "x86", True, True):
                 return False
