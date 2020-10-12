@@ -267,15 +267,7 @@ class Command:
     __remote_path = "/data/local/tmp/"
     __tool_local_path = os.path.join(sys.path[0], "tools", "analyze")
     __load_client_script = "load_client.lua"
-    # 模块注入
-    '''
-    '''
-    @staticmethod
-    def inject(cmd_args):
-        opts, args = getopt.getopt(cmd_args, "p:m:", ["process=", "module="])
-        log.info("opts %s args:%s" %(opts, args))
-        pass
-
+    # 更新模块
     @staticmethod
     def upload_tools(abi, x86_arm):
         remote_path = Command.__remote_path + abi + "/"
@@ -320,31 +312,59 @@ class Command:
             return False
         return True
 
-
+    # 模块注入的函数
     @staticmethod
-    def inject(pid, abi, need_push = False, x86_arm = False, zygote = False):
-        # 上传各个模块
-        if need_push : Command.upload_tools(abi, x86_arm)
+    def inject_internal(pid, abi, need_push = False, x86_arm = False, zygote = False):
         remote_loader = Command.__remote_path + abi + "/" + Command.__loader_name
         remote_inject_so = Command.__remote_path + abi + "/" + Command.__client_mod_name
         remote_client = Command.__remote_path + "armeabi-v7a/" + Command.__client_mod_name
         remote_script = Command.__remote_path + Command.__load_client_script
         if x86_arm:
             remote_inject_so = Command.__remote_path + abi + "/" + Command.__client_fake_name
-        shell_cmd = '"%s" inject --so="%s" --script="%s" --zygote --x86_arm' % (remote_loader, remote_inject_so, remote_script)
-        if x86_arm:
-            shell_cmd = shell_cmd + " --x86_arm"
+
+        log.info("need push %s" % str(need_push))
+        # 上传各个模块
+        if not util.check_exist(remote_loader) or need_push:
+            Command.upload_tools(abi, x86_arm)
         if zygote:
-            shell_cmd = shell_cmd + " --zygote"
-            shell_cmd = shell_cmd + " --pid " + util.get_process_id("zygote")
-        else:
-            shell_cmd = shell_cmd + " --pid " + pid
+            pid = util.get_process_id("zygote")
+        shell_cmd = '"%s" inject --pid=%s --so="%s" --script="%s" %s %s' % \
+            (remote_loader, pid, remote_inject_so, remote_script, '--zygote' if zygote else '', '--x86-arm' if x86_arm else '')
         shell_cmd = util.getshell(shell_cmd)
         log.info("inject cmd %s" % shell_cmd)
         if not util.execute_cmd(shell_cmd):
             return False
         return False
 
+    # 模块注入
+    '''
+    '''
+    @staticmethod
+    def inject(cmd_args):
+        opts, args = getopt.getopt(cmd_args, "", ["process=", "zygote", "abi=", "x86-arm", "update"])
+        log.info("opts %s args:%s" %(opts, args))
+        process_name, abi = "", "x86"
+        need_push, x86_arm, zygote = False, False, False
+        for op, value in opts:
+            if op == "-p" or op == "--process":
+                process_name = value
+            elif op == "--abi":
+                abi = value
+            elif op == "--x86-arm":
+                x86_arm = True
+            elif op == "--update":
+                need_push = True
+            elif op == "--zygote":
+                zygote = True
+            else:
+                log.error("unkown opt:%s value:%s" % (op, value))
+                return False
+        # 1、获取进程id
+        process_id = util.get_process_id(process_name)
+        if "" == process_id:
+            log.error("get process:%s id fail" % process_name)
+            return False
+        return Command.inject_internal(process_id, abi, need_push, x86_arm, zygote)
 
     # 执行Lua脚本
     '''
@@ -352,10 +372,11 @@ class Command:
     '''
     @staticmethod
     def dolua(cmd_args):
-        opts, args = getopt.getopt(cmd_args, "p:s:f:", ["process=", "script=", "func="])
+        opts, args = getopt.getopt(cmd_args, "p:s:f:", ["process=", "script=", "func=", "abi=", "x86-arm", "update"])
         log.info("opts %s args:%s" %(opts, args))
         lua_script_name, func_name, process_name = "", "", ""
-        x86_arm = True
+        need_upate, x86_arm = False, False
+        abi = "x86"
         for op, value in opts:
             if op == "-s" or op == "--script":
                 lua_script_name = value
@@ -363,6 +384,12 @@ class Command:
                 func_name = value
             elif op == "-p" or op == "--process":
                 process_name = value
+            elif op == "--abi":
+                abi = value
+            elif op == "--x86-arm":
+                x86_arm = True
+            elif op == "--update":
+                need_upate = True
             else:
                 log.error("unkown opt:%s value:%s" % (op, value))
                 return False
@@ -374,7 +401,7 @@ class Command:
         # 2、判断client.so是否已经注入
         if not util.check_module_exist(process_id, "libclient.so"):
             log.warn("libclient.so not in process")
-            if not Command.inject(process_id, "x86", True, True):
+            if not Command.inject(process_id, abi, need_upate, x86_arm, False):
                 return False
 
         # 3、loader 通知 client 调用 指定 lua 脚本的函数
@@ -383,7 +410,8 @@ class Command:
         if x86_arm:
             remote_inject_so = Command.__remote_path + abi + "/" + Command.__client_fake_name
 
-        shell_cmd = '"%s" dolua --so="%s" --script="%s" --func="%s"' % (remote_loader, remote_inject_so, lua_script_name, func_name)
+        shell_cmd = '"%s" dolua --pid="%s" --so="%s" --script="%s" --func="%s" %s' % \
+            (remote_loader, process_id, remote_inject_so, lua_script_name, func_name, '--x86-arm' if x86_arm else '')
         log.info("do cmd %s" % shell_cmd)
         if not util.execute_cmd(shell_cmd):
             return False

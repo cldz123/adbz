@@ -109,7 +109,7 @@ class Adb:
         if [ ! -d /data/local/tmp ] then mkdir -p /data/local/tmp fi
         '''
         # 确保 /data/local/tmp 目录存在
-        if not Adb.check_dir("/data/local/tmp"):
+        if not check_dir("/data/local/tmp"):
             log.info("---------------------------------")
             Adb.mkdir("/data/local/tmp")
         return True
