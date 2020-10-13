@@ -46,13 +46,13 @@ def Run():
         return Command.shell(current_cmd_arg)
     if current_cmd == "dump":
         return Command.dump(sys.argv[2:])
-    if current_cmd == "module" or current_cmd == "mod":
+    if current_cmd == "module" or current_cmd == "mod" or current_cmd == "moudle":
         return Command.module(sys.argv[2:])
     if current_cmd == "process":
         return Command.process(sys.argv[2:])
     if current_cmd == "inject":
         return Command.inject(sys.argv[2:])
-    if current_cmd == "dolua":
+    if current_cmd == "luacall":
         return Command.dolua(sys.argv[2:])
     if current_cmd == "lua":
         return Command.loadlua(sys.argv[2:])

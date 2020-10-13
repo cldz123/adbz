@@ -104,8 +104,8 @@ class Command:
 
     '''
     dump 模块或内存
-    1、adbz dump -p com.tencent.tmgp.sgame -m libil2cpp.so [-n file_name] [-c cbs]
-    2、adbz dump -p com.tencent.tmgp.sgame -b base_addr -s size [-n file_name] [-c cbs]
+    1. adbz dump -p com.tencent.tmgp.sgame -m libil2cpp.so [-n file_name] [-c cbs]
+    2. adbz dump -p com.tencent.tmgp.sgame -b base_addr -s size [-n file_name] [-c cbs]
     '''
     @staticmethod
     def dump(cmd_args):
@@ -266,7 +266,6 @@ class Command:
     __loader_name = "loader"
     __remote_path = "/data/local/tmp/"
     __tool_local_path = os.path.join(sys.path[0], "tools", "analyze")
-    __load_client_script = "load_client.lua"
     # 更新模块
     @staticmethod
     def upload_tools(abi, x86_arm):
@@ -296,11 +295,6 @@ class Command:
             shell_cmd = util.getcmd('push "%s" "%s"' % (local_client, remote_path))
             if not util.execute_cmd(shell_cmd):
                 return False
-            # 上传 load script
-            load_client_script = os.path.join(Command.__tool_local_path, Command.__load_client_script)
-            shell_cmd = util.getcmd('push "%s" "%s"' % (load_client_script, Command.__remote_path))
-            if not util.execute_cmd(shell_cmd):
-                return False
         else:
             # 上传client
             local_client = os.path.join(Command.__tool_local_path, abi, Command.__client_mod_name)
@@ -312,43 +306,79 @@ class Command:
             return False
         return True
 
+    # 上传lua script
+    @staticmethod
+    def upload_script(script):
+        load_client_script = ""
+        # 判断当前路径是否存在
+        if os.path.isfile(script):
+            load_client_script = script
+        else:
+            # 不存在则找tool/analyze目录下
+            if os.path.isfile(os.path.join(Command.__tool_local_path, script)):
+                load_client_script = os.path.join(Command.__tool_local_path, script)
+        remote_script = ""
+        if "" != load_client_script:
+            log.info("update load script to %s" % Command.__remote_path)
+            remote_script = Command.__remote_path + os.path.basename(load_client_script)
+            shell_cmd = util.getcmd('push "%s" "%s"' % (load_client_script, Command.__remote_path))
+            if not util.execute_cmd(shell_cmd): return ""
+            return remote_script
+        return ""
+
     # 模块注入的函数
     @staticmethod
-    def inject_internal(pid, abi, need_push = False, x86_arm = False, zygote = False):
+    def inject_internal(pid, abi, init_script, need_push = False, x86_arm = False):
         remote_loader = Command.__remote_path + abi + "/" + Command.__loader_name
         remote_inject_so = Command.__remote_path + abi + "/" + Command.__client_mod_name
-        remote_client = Command.__remote_path + "armeabi-v7a/" + Command.__client_mod_name
-        remote_script = Command.__remote_path + Command.__load_client_script
         if x86_arm:
             remote_inject_so = Command.__remote_path + abi + "/" + Command.__client_fake_name
+        
+        # 上传 初始化 script,检验脚本存不存在
+        remote_script = Command.upload_script(init_script)
 
-        log.info("need push %s" % str(need_push))
         # 上传各个模块
         if not util.check_exist(remote_loader) or need_push:
             Command.upload_tools(abi, x86_arm)
-        if zygote:
-            pid = util.get_process_id("zygote")
-        shell_cmd = '"%s" inject --pid=%s --so="%s" --script="%s" %s %s' % \
-            (remote_loader, pid, remote_inject_so, remote_script, '--zygote' if zygote else '', '--x86-arm' if x86_arm else '')
+        
+        shell_cmd = '"%s" inject --pid=%s --so="%s" --script=%s ' % (remote_loader, pid, remote_inject_so, '"%s"' % remote_script if "" != remote_script else "")
         shell_cmd = util.getshell(shell_cmd)
-        log.info("inject cmd %s" % shell_cmd)
         if not util.execute_cmd(shell_cmd):
             return False
-        return False
+        return True
+
+    @staticmethod
+    def uninject_internal(pid, abi, x86_arm):
+        remote_loader = Command.__remote_path + abi + "/" + Command.__loader_name
+        remote_inject_so = Command.__remote_path + abi + "/" + Command.__client_mod_name
+        if x86_arm:
+            remote_inject_so = Command.__remote_path + abi + "/" + Command.__client_fake_name
+
+        if not util.check_exist(remote_loader):
+            log.error("check loader not exist")
+            return False
+        
+        shell_cmd = '"%s" uninject --pid=%s --so="%s"' % (remote_loader, pid, remote_inject_so)
+        shell_cmd = util.getshell(shell_cmd)
+        if not util.execute_cmd(shell_cmd):
+            return False
+        return True
 
     # 模块注入
     '''
     '''
     @staticmethod
     def inject(cmd_args):
-        opts, args = getopt.getopt(cmd_args, "", ["process=", "zygote", "abi=", "x86-arm", "update"])
+        opts, args = getopt.getopt(cmd_args, "p:s:a:", ["process=", "script=", "abi=", "zygote", "x86-arm", "update"])
         log.info("opts %s args:%s" %(opts, args))
-        process_name, abi = "", "x86"
+        process_name, abi, init_script = "", "x86", ""
         need_push, x86_arm, zygote = False, False, False
         for op, value in opts:
             if op == "-p" or op == "--process":
                 process_name = value
-            elif op == "--abi":
+            elif op == "-s" or op == "--script":
+                init_script = value
+            elif op == "-a" or op == "--abi":
                 abi = value
             elif op == "--x86-arm":
                 x86_arm = True
@@ -359,27 +389,110 @@ class Command:
             else:
                 log.error("unkown opt:%s value:%s" % (op, value))
                 return False
-        # 1、获取进程id
-        process_id = util.get_process_id(process_name)
+        if len(opts) == 0 and len(args) >= 2:
+            process_name = args[0]
+            init_script = args[1]
+            if len(args) == 3:
+                abi = args[2]
+
+        # 1. 获取进程id
+        process_id = ""
+        if zygote:
+            # 注入zygote
+            process_id = util.get_process_id("zygote")
+        else:
+            process_id = util.get_process_id(process_name)
         if "" == process_id:
             log.error("get process:%s id fail" % process_name)
             return False
-        return Command.inject_internal(process_id, abi, need_push, x86_arm, zygote)
+        return Command.inject_internal(process_id, abi, init_script, need_push, x86_arm)
+
+    # 模块卸载
+    @staticmethod
+    def uninject(cmd_args):
+        opts, args = getopt.getopt(cmd_args, "p:", ["process=", "abi=", "zygote", "x86-arm"])
+        log.info("opts %s args:%s" %(opts, args))
+        process_name, abi = "", "x86"
+        need_push, x86_arm, zygote = False, False, False
+        for op, value in opts:
+            if op == "-p" or op == "--process":
+                process_name = value
+            elif op == "--abi":
+                abi = value
+            elif op == "--x86-arm":
+                x86_arm = True
+            elif op == "--zygote":
+                zygote = True
+            else:
+                log.error("unkown opt:%s value:%s" % (op, value))
+                return False
+        if len(opts) == 0 and len(args) >= 1:
+            process_name = args[0]
+            if len(args) == 2:
+                abi = args[1]
+
+        # 1. 获取进程id
+        process_id = ""
+        if zygote:
+            # 注入zygote
+            process_id = util.get_process_id("zygote")
+        else:
+            process_id = util.get_process_id(process_name)
+        if "" == process_id:
+            log.error("get process:%s id fail" % process_name)
+            return False
+        return Command.uninject_internal(process_id, abi, x86_arm)
+
+    # 检查当前进程是否已注入模块了
+    @staticmethod
+    def lua_check(process_name, script, zygote, abi, x86_arm, need_upate):
+        # 1. 获取进程id
+        process_id = ""
+        if zygote:
+            # 注入zygote
+            process_id = util.get_process_id("zygote")
+        else:
+            process_id = util.get_process_id(process_name)
+        if "" == process_id:
+            log.error("get process:%s id fail" % process_name)
+            return False, "", "", "", ""
+
+        # 2. 上传script脚本
+        remote_script = Command.upload_script(script)
+        if "" == remote_script:
+            log.error("remote script uplaod fail")
+            return False, "", "", "", ""
+
+        # 3. 判断client.so是否已经注入, 判断模块是否存在
+        check_so_name = Command.__client_mod_name
+        if x86_arm:
+            check_so_name = Command.__client_fake_name
+        if not util.check_module_exist(process_id, check_so_name):
+            log.warn("%s not in process" % check_so_name)
+            if not Command.inject_internal(process_id, abi, "", need_upate, x86_arm):
+                return False, "", "", "", ""
+
+        # 4. 获取load so等路径
+        remote_loader = Command.__remote_path + abi + "/" + Command.__loader_name
+        remote_inject_so = Command.__remote_path + abi + "/" + Command.__client_mod_name
+        if x86_arm:
+            remote_inject_so = Command.__remote_path + abi + "/" + Command.__client_fake_name
+
+        return True, process_id, remote_script, remote_loader, remote_inject_so
 
     # 执行Lua脚本
     '''
-    adbz dolua -p process_name -s lua_script_name -f lua_func_name
+    adbz luacall --process com.aligames.sgzzlb.aligames --script=test2.lua --func=TestCall
     '''
     @staticmethod
     def dolua(cmd_args):
         opts, args = getopt.getopt(cmd_args, "p:s:f:", ["process=", "script=", "func=", "abi=", "x86-arm", "update"])
         log.info("opts %s args:%s" %(opts, args))
-        lua_script_name, func_name, process_name = "", "", ""
-        need_upate, x86_arm = False, False
-        abi = "x86"
+        process_name, abi, lua_script, func_name = "", "x86", "", ""
+        need_upate, x86_arm, zygote = False, False, False
         for op, value in opts:
             if op == "-s" or op == "--script":
-                lua_script_name = value
+                lua_script = value
             elif op == "-f" or op == "--func":
                 func_name = value
             elif op == "-p" or op == "--process":
@@ -393,45 +506,82 @@ class Command:
             else:
                 log.error("unkown opt:%s value:%s" % (op, value))
                 return False
-        # 1、获取进程id
-        process_id = util.get_process_id(process_name)
-        if "" == process_id:
-            log.error("get process:%s id fail" % process_name)
+        
+        
+        ret, process_id, remote_script, remote_loader, remote_inject_so = Command.lua_check(process_name, lua_script, zygote, abi, x86_arm, need_upate)
+        if not ret:
             return False
-        # 2、判断client.so是否已经注入
-        if not util.check_module_exist(process_id, "libclient.so"):
-            log.warn("libclient.so not in process")
-            if not Command.inject(process_id, abi, need_upate, x86_arm, False):
-                return False
-
-        # 3、loader 通知 client 调用 指定 lua 脚本的函数
-        remote_loader = Command.__remote_path + abi + "/" + Command.__loader_name
-        remote_inject_so = Command.__remote_path + abi + "/" + Command.__client_mod_name
-        if x86_arm:
-            remote_inject_so = Command.__remote_path + abi + "/" + Command.__client_fake_name
-
-        shell_cmd = '"%s" dolua --pid="%s" --so="%s" --script="%s" --func="%s" %s' % \
-            (remote_loader, process_id, remote_inject_so, lua_script_name, func_name, '--x86-arm' if x86_arm else '')
-        log.info("do cmd %s" % shell_cmd)
+        shell_cmd = '"%s" luacall --pid="%s" --so="%s" --script="%s" --func="%s" ' % \
+            (remote_loader, process_id, remote_inject_so, remote_script, func_name)
+        shell_cmd = util.getshell(shell_cmd)
         if not util.execute_cmd(shell_cmd):
             return False
         return True
 
+    '''
+    加载某个脚本
+    adbz lua --process com.aligames.sgzzlb.aligames --script=test2.lua
+    '''
     @staticmethod
     def loadlua(cmd_args):
-        opts, args = getopt.getopt(cmd_args, "p:m:", ["process=", "module="])
+        opts, args = getopt.getopt(cmd_args, "p:s:", ["process=", "script=", "abi=", "x86-arm", "update"])
         log.info("opts %s args:%s" %(opts, args))
-        pass
+        process_name, abi, lua_script = "", "x86", ""
+        need_upate, x86_arm, zygote = False, False, False
+        for op, value in opts:
+            if op == "-s" or op == "--script":
+                lua_script = value
+            elif op == "-p" or op == "--process":
+                process_name = value
+            elif op == "--abi":
+                abi = value
+            elif op == "--x86-arm":
+                x86_arm = True
+            elif op == "--update":
+                need_upate = True
+            else:
+                log.error("unkown opt:%s value:%s" % (op, value))
+                return False
+
+        ret, process_id, remote_script, remote_loader, remote_inject_so = Command.lua_check(process_name, lua_script, zygote, abi, x86_arm, need_upate)
+        if not ret:
+            return False
+        shell_cmd = '"%s" lua --pid="%s" --so="%s" --script="%s" ' % (remote_loader, process_id, remote_inject_so, remote_script)
+        shell_cmd = util.getshell(shell_cmd)
+        if not util.execute_cmd(shell_cmd):
+            return False
+        return True
     
+    '''
+    删除Lua脚本
+    adbz unlua --process com.aligames.sgzzlb.aligames --script=test2.lua
+    '''
     @staticmethod
     def unloadlua(cmd_args):
-        opts, args = getopt.getopt(cmd_args, "p:m:", ["process=", "module="])
+        opts, args = getopt.getopt(cmd_args, "p:s:", ["process=", "script=", "abi=", "x86-arm", "update"])
         log.info("opts %s args:%s" %(opts, args))
-        pass
+        process_name, abi, lua_script = "", "x86", ""
+        need_upate, x86_arm, zygote = False, False, False
+        for op, value in opts:
+            if op == "-s" or op == "--script":
+                lua_script = value
+            elif op == "-p" or op == "--process":
+                process_name = value
+            elif op == "--abi":
+                abi = value
+            elif op == "--x86-arm":
+                x86_arm = True
+            elif op == "--update":
+                need_upate = True
+            else:
+                log.error("unkown opt:%s value:%s" % (op, value))
+                return False
 
-    # 模块卸载
-    @staticmethod
-    def uninject(cmd_args):
-        opts, args = getopt.getopt(cmd_args, "p:m:", ["process=", "module="])
-        log.info("opts %s args:%s" %(opts, args))
-        pass
+        ret, process_id, remote_script, remote_loader, remote_inject_so = Command.lua_check(process_name, lua_script, zygote, abi, x86_arm, need_upate)
+        if not ret:
+            return False
+        shell_cmd = '"%s" unlua --pid="%s" --so="%s" --script="%s" ' % (remote_loader, process_id, remote_inject_so, remote_script)
+        shell_cmd = util.getshell(shell_cmd)
+        if not util.execute_cmd(shell_cmd):
+            return False
+        return True
