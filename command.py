@@ -27,8 +27,10 @@ class Command:
             else:
                 log.error("unkown opt:%s value:%s" % (op, value))
                 return False
-        if len(opts) == 0 and len(args) != 0:
-            remote_file = args[0]
+        if len(opts) == 0:
+            remote_file = args[0] if len(args) >= 1 else ""
+            local_path = args[1] if len(args) >= 2 else ""
+            local_name = args[2] if len(args) >= 3 else ""
         
         if local_path == "":
             local_path = "./"
@@ -56,9 +58,10 @@ class Command:
     '''
     @staticmethod
     def push(cmd_args):
-        opts, args = getopt.getopt(cmd_args, "l:r:n:", ["local-file=", "remote-path=", "remote-name="])
+        opts, args = getopt.getopt(cmd_args, "l:r:n:", ["local-file=", "remote-path=", "remote-name=", "bak", "exec"])
         log.info("opts %s args:%s" %(opts, args))
         local_file, remote_path, remote_name = "", "", ""
+        bak_file, exec_file = False, False
         for op, value in opts:
             if op == "-l" or op == "--local-file":
                 local_file = value
@@ -66,9 +69,17 @@ class Command:
                 remote_path = value
             elif op == "-n" or op == "--remote-name":
                 remote_name = value
+            elif op == "--bak":
+                bak_file = True
+            elif op == "--exec":
+                exec_file = True
             else:
                 log.error("unkown opt:%s value:%s" % (op, value))
                 return False
+        if len(opts) == 0:
+            local_file = args[0] if len(args) >= 1 else ""
+            remote_path = args[1] if len(args) >= 2 else ""
+            remote_name = args[2] if len(args) >= 3 else ""
     
         if remote_path == "":
             remote_path = "/data/local/tmp"
@@ -76,19 +87,27 @@ class Command:
             # push 目录
             remote_file = remote_path + "/"
             util.mkdir(remote_file)
-        else:
+        elif os.path.isfile(os.path.join(os.getcwd(), local_file)):
             # push 文件
             # local_path = os.path.dirname(local_file)
             local_fname = os.path.basename(local_file)
             if remote_name == "":
                 remote_name = local_fname
             remote_file = remote_path + "/" + remote_name
-
+        else:
+            log.error("local file:%s %s not exist" % (local_file, os.path.join(os.getcwd(), local_file)))
+            return False
+        if bak_file:
+            shell_cmd = util.getshell('mv "%s" "%s.bak"' % (remote_file, remote_file))
+            if not util.execute_cmd(shell_cmd): return False
         log.info("local:%s remote:%s" % (local_file, remote_file))
         shell_cmd = util.getcmd('push "%s" "%s"' % (local_file, remote_file))
         ret, res_str = util.execute_cmd_with_stdout(shell_cmd)
         if not ret:
             return False
+        if exec_file:
+            shell_cmd = util.getshell('chmod 777 "%s"' % remote_file)
+            return util.execute_cmd(shell_cmd)
         return True
  
     '''
@@ -132,6 +151,10 @@ class Command:
             else:
                 log.error("unkown opt:%s value:%s" % (op, value))
                 return False
+        if len(opts) == 0:
+            process_name = args[0] if len(args) >= 1 else ""
+            module_name = args[1] if len(args) >= 2 else ""
+
         # check args
         if cbs <= 0:
             log.error("error cbs:%d" % cbs)
@@ -192,6 +215,10 @@ class Command:
             else:
                 log.error("unkown opt:%s value:%s" % (op, value))
                 return False
+        if len(opts) == 0:
+            process_name = args[0] if len(args) >= 1 else ""
+            module_name = args[1] if len(args) >= 2 else ""
+
         # 获取进程id
         process_id = util.get_process_id(process_name)
         if "" == process_id:
@@ -212,7 +239,7 @@ class Command:
     '''
     @staticmethod
     def process(cmd_args):
-        opts, args = getopt.getopt(cmd_args, "p:m:", ["process=", "module="])
+        opts, args = getopt.getopt(cmd_args, "p:", ["process="])
         log.info("opts %s args:%s" %(opts, args))
         process_name = ""
         for op, value in opts:
@@ -221,8 +248,8 @@ class Command:
             else:
                 log.error("unkown op:%s value:%s" % (op, value))
                 return False
-        if process_name == "":
-            process_name = args[0]
+        if len(opts) == 0:
+            process_name = args[0] if len(args) >= 1 else ""
 
         # 获取进程id
         process_id = util.get_process_id(process_name)
@@ -389,11 +416,10 @@ class Command:
             else:
                 log.error("unkown opt:%s value:%s" % (op, value))
                 return False
-        if len(opts) == 0 and len(args) >= 2:
-            process_name = args[0]
-            init_script = args[1]
-            if len(args) == 3:
-                abi = args[2]
+        if len(opts) == 0:
+            process_name = args[0] if len(args) >= 1 else ""
+            init_script = args[1] if len(args) >= 2 else ""
+            abi = args[2] if len(args) >= 3 else ""
 
         # 1. 获取进程id
         process_id = ""
@@ -426,10 +452,9 @@ class Command:
             else:
                 log.error("unkown opt:%s value:%s" % (op, value))
                 return False
-        if len(opts) == 0 and len(args) >= 1:
-            process_name = args[0]
-            if len(args) == 2:
-                abi = args[1]
+        if len(opts) == 0:
+            process_name = args[0] if len(args) >= 1 else ""
+            abi = args[1] if len(args) >= 2 else ""
 
         # 1. 获取进程id
         process_id = ""
@@ -506,7 +531,11 @@ class Command:
             else:
                 log.error("unkown opt:%s value:%s" % (op, value))
                 return False
-        
+        if len(opts) == 0:
+            process_name = args[0] if len(args) >= 1 else ""
+            lua_script = args[1] if len(args) >= 2 else ""
+            func_name = args[2] if len(args) >= 3 else ""
+            abi = args[3] if len(args) >= 4 else ""
         
         ret, process_id, remote_script, remote_loader, remote_inject_so = Command.lua_check(process_name, lua_script, zygote, abi, x86_arm, need_upate)
         if not ret:
@@ -542,6 +571,10 @@ class Command:
             else:
                 log.error("unkown opt:%s value:%s" % (op, value))
                 return False
+        if len(opts) == 0:
+            process_name = args[0] if len(args) >= 1 else ""
+            lua_script = args[1] if len(args) >= 2 else ""
+            abi = args[2] if len(args) >= 3 else ""
 
         ret, process_id, remote_script, remote_loader, remote_inject_so = Command.lua_check(process_name, lua_script, zygote, abi, x86_arm, need_upate)
         if not ret:
@@ -576,6 +609,10 @@ class Command:
             else:
                 log.error("unkown opt:%s value:%s" % (op, value))
                 return False
+        if len(opts) == 0:
+            process_name = args[0] if len(args) >= 1 else ""
+            lua_script = args[1] if len(args) >= 2 else ""
+            abi = args[2] if len(args) >= 3 else ""
 
         ret, process_id, remote_script, remote_loader, remote_inject_so = Command.lua_check(process_name, lua_script, zygote, abi, x86_arm, need_upate)
         if not ret:

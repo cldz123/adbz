@@ -111,7 +111,7 @@ class Adb:
         # 确保 /data/local/tmp 目录存在
         if not check_dir("/data/local/tmp"):
             log.info("---------------------------------")
-            Adb.mkdir("/data/local/tmp")
+            mkdir("/data/local/tmp")
         return True
     
     # 获取包装过的adb命令
