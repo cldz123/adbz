@@ -54,14 +54,14 @@ class Command:
 
     '''
     push 上传文件
-    adbz push -l local_path [-r remote_path] [-n remote_name]
+    adbz push -l local_path [-r remote_path] [-n remote_name] [--run]
     '''
     @staticmethod
     def push(cmd_args):
-        opts, args = getopt.getopt(cmd_args, "l:r:n:", ["local-file=", "remote-path=", "remote-name=", "bak", "exec"])
+        opts, args = getopt.getopt(cmd_args, "l:r:n:m", ["local-file=", "remote-path=", "remote-name=", "no-bak", "mod="])
         log.info("opts %s args:%s" %(opts, args))
         local_file, remote_path, remote_name = "", "", ""
-        bak_file, exec_file = False, False
+        bak_file, chmod = True, "777"
         for op, value in opts:
             if op == "-l" or op == "--local-file":
                 local_file = value
@@ -69,10 +69,10 @@ class Command:
                 remote_path = value
             elif op == "-n" or op == "--remote-name":
                 remote_name = value
-            elif op == "--bak":
-                bak_file = True
-            elif op == "--exec":
-                exec_file = True
+            elif op == "-n" or op == "--mod":
+                chmod = value
+            elif op == "--no-bak":
+                bak_file = False
             else:
                 log.error("unkown opt:%s value:%s" % (op, value))
                 return False
@@ -99,15 +99,17 @@ class Command:
             return False
         if bak_file:
             shell_cmd = util.getshell('mv "%s" "%s.bak"' % (remote_file, remote_file))
-            if not util.execute_cmd(shell_cmd): return False
+            util.execute_cmd(shell_cmd)
         log.info("local:%s remote:%s" % (local_file, remote_file))
         shell_cmd = util.getcmd('push "%s" "%s"' % (local_file, remote_file))
         ret, res_str = util.execute_cmd_with_stdout(shell_cmd)
         if not ret:
             return False
-        if exec_file:
-            shell_cmd = util.getshell('chmod 777 "%s"' % remote_file)
-            return util.execute_cmd(shell_cmd)
+        if chmod != "":
+            shell_cmd = util.getshell('chmod %s "%s"' % (chmod, remote_file))
+            if not util.execute_cmd(shell_cmd): return False
+            # shell_cmd = util.getshell('".%s"' % remote_file)
+            # return util.execute_cmd(shell_cmd)
         return True
  
     '''
